@@ -34,32 +34,32 @@ end
 
 
 
-
-
+-- ugly workaround to wait for the correct image to be selected.
+local function select_photo(photo, catalog)
+   currentFilename = photo:getFormattedMetadata("fileName")
+   catalog:setSelectedPhotos(photo,{})
+   local sel_photo = catalog:getTargetPhoto()
+   while currentFilename ~= sel_photo:getFormattedMetadata("fileName") do
+      sel_photo = catalog:getTargetPhoto()
+   end 
+end
 
 local function work_on_range(range, catalog, progress, startIndex, totalCount)
   local count = #range
 
-  
-  photo = range[1] 
-  currentFilename = photo:getFormattedMetadata("fileName")
-  catalog:setSelectedPhotos(photo,{})
-  local sel_photo = catalog:getTargetPhoto()
-  while currentFilename ~= sel_photo:getFormattedMetadata("fileName") do
-     sel_photo = catalog:getTargetPhoto()
-  end
+ 
+  select_photo(range[1], catalog)
   local startValue = LrDevelopController.getValue("Exposure") 
-
-
-  photo = range[count]
-  currentFilename = photo:getFormattedMetadata("fileName")
-  catalog:setSelectedPhotos(photo,{})
-  local sel_photo = catalog:getTargetPhoto()
-  while currentFilename ~= sel_photo:getFormattedMetadata("fileName") do
-     sel_photo = catalog:getTargetPhoto()
-  end
+  local startTemp = LrDevelopController.getValue("Temperature") 
+  local startTint = LrDevelopController.getValue("Tint") 
+  
+  select_photo(range[count], catalog)
   local endValue = LrDevelopController.getValue("Exposure") 
-
+  local endTemp = LrDevelopController.getValue("Temperature") 
+  local endTint = LrDevelopController.getValue("Tint") 
+  
+  
+  
   progress:setPortionComplete(startIndex, totalCount)
   log:trace("ExposureBlendRange called", count)
   
@@ -67,23 +67,27 @@ local function work_on_range(range, catalog, progress, startIndex, totalCount)
 
       currentFilename = photo:getFormattedMetadata("fileName")
 
-      catalog:setSelectedPhotos(photo,{})
+      select_photo(photo, catalog)
 
-      -- ugly workaround to wait for the correct image to be selected.
-      sel_photo = catalog:getTargetPhoto()
-      while currentFilename ~= sel_photo:getFormattedMetadata("fileName") do
-        sel_photo = catalog:getTargetPhoto()
-      end
-
-      local target = startValue + (endValue - startValue) * ((i-1) / (count-1))
-      local ev = convertToEV(target)
+      local fac = (i-1) / (count-1)
+      local target = startValue + (endValue - startValue) * fac
+      local temp = startTemp + (endTemp - startTemp) * fac
+      local tint = startTint + (endTint - startTint) * fac
 
       log:tracef("Picture: %s %f %f %f", currentFilename, startValue, endValue, target)
-      --offset = LrDevelopController.getValue("Exposure")
 
       LrDevelopController.startTracking()
       LrDevelopController.setValue("Exposure", target)
       LrDevelopController.stopTracking()
+ 
+      LrDevelopController.startTracking()
+      LrDevelopController.setValue("Temperature", temp)
+      LrDevelopController.stopTracking()
+
+      LrDevelopController.startTracking()
+      LrDevelopController.setValue("Tint", tint)
+      LrDevelopController.stopTracking()      
+      
 
       if progress:isCanceled() then LrErrors.throwCanceled() end
 
